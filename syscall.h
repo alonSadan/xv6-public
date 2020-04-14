@@ -25,3 +25,5 @@
 #define SYS_set_ps_priority 24
 #define SYS_set_cfs_priority 25
 #define SYS_proc_info 26
+#define SYS_yield 27
+#define SYS_wait2 28

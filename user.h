@@ -1,4 +1,6 @@
-#include "perf.h"
+#include "stats.h"
+#include "types.h"
+
 
 struct stat;
 struct rtcdate;
@@ -11,7 +13,7 @@ struct rtcdate;
 
 // system calls
 int set_cfs_priority(int priority);
-int proc_info(struct perf *);
+int proc_info(struct stats *);
 int fork(void);
 void exit(int status) __attribute__((noreturn));
 int wait(int *status);
@@ -36,6 +38,9 @@ int uptime(void);
 int memsize(void);
 int policy(int);
 int set_ps_priority(int);
+int yield(void);
+int wait2(int* ,int* ,int* ,int* ,double* ,double* ,xlong*);
+
 
 // ulib.c
 int stat(const char*, struct stat*);

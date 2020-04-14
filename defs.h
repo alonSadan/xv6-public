@@ -121,6 +121,7 @@ void            setproc(struct proc*);
 void            sleep(void*, struct spinlock*);
 void            userinit(void);
 int             wait(int *status);
+int             wait2(int *retime,int *rtime,int *stime,int *ps_priority,double *cfs_priority,double *runTimeRatio, long long *accumulator);
 void            wakeup(void*);
 void            yield(void);
 void            updateCFSPriority(void);

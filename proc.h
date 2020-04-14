@@ -1,4 +1,4 @@
-#include "perf.h"
+#include "stats.h"
 
 // Per-CPU state
 struct cpu {
@@ -59,9 +59,7 @@ struct proc {
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
   int exitStatus;              // Exit status
-  long long accumulator;       // priority accumulator
-  struct perf perf;            // perf structers
-  double cfs_priority;         // decay factor
+  struct stats stats;            // perf structers
 };
 
 // Process memory is laid out contiguously, low addresses first:

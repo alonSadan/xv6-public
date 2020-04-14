@@ -108,6 +108,8 @@ extern int sys_uptime(void);
 extern int sys_memsize(void);
 extern int sys_policy(void);
 extern int sys_set_ps_priority(void);
+extern int sys_yield(void);
+extern int sys_wait2(void);
 
 static int (*syscalls[])(void) = {
 [SYS_proc_info]		sys_proc_info,
@@ -135,7 +137,9 @@ static int (*syscalls[])(void) = {
 [SYS_close]   sys_close,
 [SYS_memsize] sys_memsize,
 [SYS_policy] sys_policy,
-[SYS_set_ps_priority] sys_set_ps_priority
+[SYS_set_ps_priority] sys_set_ps_priority,
+[SYS_yield] sys_yield,
+[SYS_wait2] sys_wait2
 };
 
 void

@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "random": "cpp",
+        "user.h": "c",
+        "limits": "c"
+    }
+}

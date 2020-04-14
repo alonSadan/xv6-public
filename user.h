@@ -1,10 +1,20 @@
+#include "perf.h"
+
 struct stat;
 struct rtcdate;
+// struct perf {
+//   int ps_priority;
+//   int stime;
+//   int retime;
+//   int rtime;
+// };
 
 // system calls
+int set_cfs_priority(int priority);
+int proc_info(struct perf *);
 int fork(void);
-int exit(void) __attribute__((noreturn));
-int wait(void);
+void exit(int status) __attribute__((noreturn));
+int wait(int *status);
 int pipe(int*);
 int write(int, const void*, int);
 int read(int, void*, int);
@@ -23,6 +33,9 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
+int memsize(void);
+int policy(int);
+int set_ps_priority(int);
 
 // ulib.c
 int stat(const char*, struct stat*);

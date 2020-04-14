@@ -6,7 +6,7 @@ $n = sysread(SIG, $buf, 1000);
 
 if($n > 510){
   print STDERR "boot block too large: $n bytes (max 510)\n";
-  exit 1;
+  exit(1);
 }
 
 print STDERR "boot block is $n bytes (max 510)\n";

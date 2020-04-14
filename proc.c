@@ -19,6 +19,13 @@ extern void forkret(void);
 extern void trapret(void);
 
 static void wakeup1(void *chan);
+static void            incAcc(struct proc*);
+//static struct proc*    findMinAccProc();
+static void            updateProcFromMinProc(struct proc*);
+//static int             numOfRunnableProc();
+static struct proc*    getNextProc();
+static double getRTR(struct proc*);
+
 
 void
 pinit(void)
@@ -147,8 +154,8 @@ userinit(void)
   // writes to be visible, and the lock is also needed
   // because the assignment might not be atomic.
   acquire(&ptable.lock);
-
-  p->state = RUNNABLE;
+  
+  p->state = RUNNABLE; //TODO maybe change p accumulator here
 
   release(&ptable.lock);
 }
@@ -213,8 +220,15 @@ fork(void)
   pid = np->pid;
 
   acquire(&ptable.lock);
-
+  
+  np->perf.ps_priority = 5; 
+  np->cfs_priority = curproc->cfs_priority;
+  np->perf.retime=0;
+  np->perf.rtime=0;
+  np->perf.stime=0;
+  updateProcFromMinProc(np);
   np->state = RUNNABLE;
+  
 
   release(&ptable.lock);
 
@@ -223,9 +237,9 @@ fork(void)
 
 // Exit the current process.  Does not return.
 // An exited process remains in the zombie state
-// until its parent calls wait() to find out it exited.
+// until its parent calls wait(null) to find out it exited.
 void
-exit(void)
+exit(int status)
 {
   struct proc *curproc = myproc();
   struct proc *p;
@@ -249,13 +263,14 @@ exit(void)
 
   acquire(&ptable.lock);
 
-  // Parent might be sleeping in wait().
+  // Parent might be sleeping in wait(null).
   wakeup1(curproc->parent);
 
   // Pass abandoned children to init.
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->parent == curproc){
       p->parent = initproc;
+      p->exitStatus = status;
       if(p->state == ZOMBIE)
         wakeup1(initproc);
     }
@@ -263,6 +278,8 @@ exit(void)
 
   // Jump into the scheduler, never to return.
   curproc->state = ZOMBIE;
+  curproc->exitStatus = status;
+  
   sched();
   panic("zombie exit");
 }
@@ -270,13 +287,14 @@ exit(void)
 // Wait for a child process to exit and return its pid.
 // Return -1 if this process has no children.
 int
-wait(void)
+wait(int *status)
 {
   struct proc *p;
   int havekids, pid;
   struct proc *curproc = myproc();
   
   acquire(&ptable.lock);
+  //*status = curproc->exitStatus;
   for(;;){
     // Scan through table looking for exited children.
     havekids = 0;
@@ -295,6 +313,14 @@ wait(void)
         p->name[0] = 0;
         p->killed = 0;
         p->state = UNUSED;
+        p->perf.retime = 0;
+        p->perf.rtime = 0;
+        p->perf.stime = 0;
+        p->perf.ps_priority = 0;
+        
+        if (status != null){
+          *status = p->exitStatus;
+        } 
         release(&ptable.lock);
         return pid;
       }
@@ -332,24 +358,30 @@ scheduler(void)
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
-        continue;
+    
 
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      c->proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
-
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
-
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0;
+    // Switch to chosen process.  It is the process's job
+    // to release ptable.lock and then reacquire it
+    // before jumping back to us.
+    p = getNextProc();
+    if(p == null){
+      release(&ptable.lock);
+      continue;
     }
+    
+    c->proc = p;
+    switchuvm(p);
+    p->state = RUNNING;
+    //p->perf.rtime++;
+
+    swtch(&(c->scheduler), p->context);
+    switchkvm();
+
+    incAcc(p);
+    // Process is done running for now.
+    // It should have changed its p->state before coming back.
+    c->proc = 0;
+    
     release(&ptable.lock);
 
   }
@@ -381,12 +413,17 @@ sched(void)
   mycpu()->intena = intena;
 }
 
+
 // Give up the CPU for one scheduling round.
 void
 yield(void)
 {
+  struct proc* p = myproc();
+  
   acquire(&ptable.lock);  //DOC: yieldlock
-  myproc()->state = RUNNABLE;
+  p->state = RUNNABLE;
+  incAcc(p);
+  
   sched();
   release(&ptable.lock);
 }
@@ -459,9 +496,13 @@ wakeup1(void *chan)
 {
   struct proc *p;
 
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    if(p->state == SLEEPING && p->chan == chan)
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->state == SLEEPING && p->chan == chan){
       p->state = RUNNABLE;
+      updateProcFromMinProc(p);
+    }
+  }
+
 }
 
 // Wake up all processes sleeping on chan.
@@ -486,8 +527,10 @@ kill(int pid)
     if(p->pid == pid){
       p->killed = 1;
       // Wake process from sleep if necessary.
-      if(p->state == SLEEPING)
+      if(p->state == SLEEPING){
         p->state = RUNNABLE;
+        updateProcFromMinProc(p);
+      }
       release(&ptable.lock);
       return 0;
     }
@@ -531,4 +574,104 @@ procdump(void)
     }
     cprintf("\n");
   }
+}
+
+void incAcc(struct proc* p){
+  // if(p == null || p->perf == null){
+  //   return;
+  // }
+
+  p->accumulator+=p->perf.ps_priority;
+}
+
+static void updateProcFromMinProc(struct proc* curr){
+    struct proc* p=null;
+    struct proc* minAccProc=null;
+    int counter=0;
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->state == RUNNABLE || p->state == RUNNING){
+        counter++;
+        if (minAccProc == null || minAccProc->accumulator > p->accumulator)
+            minAccProc = p;
+      }
+    }
+
+    if (counter == 1){
+      curr->accumulator = 0;
+    }else{
+      curr->accumulator = minAccProc->accumulator;
+    }
+    
+}
+
+
+
+struct proc* getNextProc(){
+  struct proc *p = null;
+  struct proc *minAccProc = null;
+  struct proc *minRTRproc = null;  //minimum Run Time Ratio
+  int counter = 0;
+
+  switch (sched_type)
+  {
+  case 0:
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->state == RUNNABLE)
+          return p;
+      
+    }
+    return null;
+    //break;
+
+  case 1:
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if((p->state == RUNNABLE)){
+        counter++;
+        if (minAccProc == null || minAccProc->accumulator > p->accumulator)
+            minAccProc = p;
+      }
+    }
+
+    return minAccProc;
+   
+  case 2:
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->state == RUNNABLE) {
+       if(minRTRproc == null || getRTR(minRTRproc) > getRTR(p)) {
+         minRTRproc = p;
+       }
+      }
+    }
+    return minRTRproc;
+
+  default:
+    return null;
+  }
+
+  return null;
+}
+
+
+
+/*  rtime × decay factor/rtime+wtime
+  */
+
+static double getRTR(struct proc* p){
+  int wtime = (p->perf.stime) + (p->perf.retime);
+  double RTR = (p->perf.rtime)*(p->cfs_priority)/(p->perf.rtime + wtime);
+  return RTR;
+}
+
+
+
+void updateCFSPriority(){  
+  struct proc *p;
+  acquire(&ptable.lock);  
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if (p->state == RUNNING) p->perf.rtime++;
+    if (p->state == RUNNABLE) p->perf.retime++;
+    if (p->state == SLEEPING) p->perf.stime++;
+    
+  }
+  release(&ptable.lock);
 }

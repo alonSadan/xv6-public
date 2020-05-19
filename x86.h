@@ -144,6 +144,33 @@ lcr3(uint val)
   asm volatile("movl %0,%%cr3" : : "r" (val));
 }
 
+// eax == [ebx] ? [ebx] = newval : eax = [ebx]
+// static inline int cas(volatile void * addr, int expected, int newval) {
+//   int ret = 1;
+//   asm volatile("lock; cmpxchgl %3, (%2)\n\t" 
+//                 "jz cas_success_%=\n\t"
+//                 "movl $0, %0\n\t"
+//                 "cas_success_%=:\n\t"
+//                 : "=m"(ret)
+//                 : "a"(expected), "b"(addr), "r"(newval)
+//                 : "memory");
+//   return ret;
+// }
+
+inline int cas(volatile void * addr, int expected, int newval) {
+  int ret = 1;
+  //uint eflags=0;
+  asm volatile("lock; cmpxchgl %3, (%2)\n\t" 
+                "pushfl\n\t"   
+                "popl %0\n\t"
+                "andl $0x40,%0\n\t"
+                : "=m"(ret)   //output, "=" is for denoting output register and "m" is for memory operand(ret is a memory operand)
+                : "a"(expected), "b"(addr), "r"(newval)  //"a" is for eax, "b" is for ebx, "r" is for some general register
+                : "memory"); //we add "memory" to tell GCC that we modify (in an un expected way?) , so that memory  addresses should not be chashed upon registers" 
+  return ret;
+}
+
+
 //PAGEBREAK: 36
 // Layout of the trap frame built on the stack by the
 // hardware and by trapasm.S, and passed to trap().

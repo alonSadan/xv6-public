@@ -1,3 +1,20 @@
+#define SIG_DFL 0 // default signal handling
+#define SIG_IGN 1 // ignore signal 
+
+#define	SIGKILL	9
+#define	SIGSTOP	17	
+#define	SIGCONT	19
+
+#define MAXSIG 32
+
+
+#define sigemptyset(set)	( *(set) = 0 )
+#define sigfillset(set)		( *(set) = ~(int)0 )
+#define sigup(set, signo)	( *(set) |= 1 << signo)
+#define sigdown(set, signo)	( *(set) &= ~(1 << signo))
+#define sigismember(set, signo)	( (*(set) & (1 << signo)) != 0)
+
+
 // Per-CPU state
 struct cpu {
   uchar apicid;                // Local APIC ID
@@ -32,14 +49,20 @@ struct context {
   uint eip;
 };
 
-enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
+enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE,_UNUSED };
+
+struct sigaction {
+  void (*sa_handler)(int);
+  uint sigmask;
+};
+
 
 // Per-process state
 struct proc {
   uint sz;                     // Size of process memory (bytes)
   pde_t* pgdir;                // Page table
   char *kstack;                // Bottom of kernel stack for this process
-  enum procstate state;        // Process state
+  volatile enum procstate state;        // Process state
   int pid;                     // Process ID
   struct proc *parent;         // Parent process
   struct trapframe *tf;        // Trap frame for current syscall
@@ -49,7 +72,24 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+
+  uint sigPending; 
+  uint sigMask;
+  struct sigaction *sighandler[MAXSIG];        
+  struct trapframe *userTfBackup;
+
+  int ignoreSignal;
+  int backupMask;
+
+  int frozen;
+  int contRequest;
+  int killRequest;
+
 };
+
+
+ 
+
 
 // Process memory is laid out contiguously, low addresses first:
 //   text

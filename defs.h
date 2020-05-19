@@ -9,6 +9,7 @@ struct spinlock;
 struct sleeplock;
 struct stat;
 struct superblock;
+struct sigaction;
 
 // bio.c
 void            binit(void);
@@ -107,7 +108,7 @@ int             cpuid(void);
 void            exit(void);
 int             fork(void);
 int             growproc(int);
-int             kill(int);
+int             kill(int, int);
 struct cpu*     mycpu(void);
 struct proc*    myproc();
 void            pinit(void);
@@ -120,6 +121,25 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
+
+int             registerSig(int signum,struct sigaction* act,struct sigaction* oldact);
+//void            sigcont(int);
+
+//void            sigign(int);
+//void            sigstop(int);
+//void            sigkill(int);
+
+int             sigret(void);
+
+//int             sigisdefault(int signum); 
+//int             sigisignore(int signum); 
+
+
+
+//invoke sigret.S
+void            invoke_sigret_start(void);
+void            invoke_sigret_end(void);
+
 
 // swtch.S
 void            swtch(struct context**, struct context*);
@@ -143,6 +163,7 @@ void            initsleeplock(struct sleeplock*, char*);
 int             memcmp(const void*, const void*, uint);
 void*           memmove(void*, const void*, uint);
 void*           memset(void*, int, uint);
+void*           memcpy(void*, const void*, uint);
 char*           safestrcpy(char*, const char*, int);
 int             strlen(const char*);
 int             strncmp(const char*, const char*, uint);
@@ -185,6 +206,8 @@ void            switchuvm(struct proc*);
 void            switchkvm(void);
 int             copyout(pde_t*, uint, void*, uint);
 void            clearpteu(pde_t *pgdir, char *uva);
+
+
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

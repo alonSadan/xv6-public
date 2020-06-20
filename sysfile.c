@@ -323,6 +323,22 @@ sys_open(void)
     }
   }
 
+  if (ip->isSymbolicLink){   
+    if (strncmp(myproc()->name,"ls",2) != 0){
+      struct inode *sym_ip;
+      if ((sym_ip = namei((char *)ip->addrs)) == 0)
+      {
+        iunlock(ip);
+        return -1;
+      }
+
+      iunlock(ip);
+      ip = sym_ip;
+      ilock(ip);
+    }
+
+  }
+  
   if((f = filealloc()) == 0 || (fd = fdalloc(f)) < 0){
     if(f)
       fileclose(f);
@@ -491,9 +507,14 @@ sys_symlink(void)
     return -1;
   }
 
+
+  //ToDo: check if need to change to writei
   //change new link's inode:
   safestrcpy((char *)ip->addrs,old,strlen(old)+1);
+  
   //iupdate(ip);
+
+
   iunlock(ip);
 
   f->type = FD_INODE;

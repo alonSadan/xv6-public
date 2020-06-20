@@ -2,6 +2,8 @@ struct stat;
 struct rtcdate;
 
 // system calls
+int symlink(const char*, const char*);
+int readlink(const char*, char*, uint);
 int fork(void);
 int exit(void) __attribute__((noreturn));
 int wait(void);

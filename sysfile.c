@@ -3,6 +3,7 @@
 // Mostly argument checking, since we don't trust
 // user code, and calls into file.c and fs.c.
 //
+#include <stdio.h>
 
 #include "types.h"
 #include "defs.h"
@@ -113,6 +114,10 @@ sys_fstat(void)
     return -1;
   return filestat(f, st);
 }
+
+
+
+
 
 // Create the path new as a link to the same inode as old.
 int
@@ -273,9 +278,10 @@ create(char *path, short type, short major, short minor)
     if(dirlink(ip, ".", ip->inum) < 0 || dirlink(ip, "..", dp->inum) < 0)
       panic("create dots");
   }
-
   if(dirlink(dp, name, ip->inum) < 0)
     panic("create: dirlink");
+  if (type == T_SYMLINK)
+    ip->isSymbolicLink = 1;
 
   iunlockput(dp);
 
@@ -442,3 +448,105 @@ sys_pipe(void)
   fd[1] = fd1;
   return 0;
 }
+
+
+int
+sys_symlink(void)
+{
+  char *old,*new;
+  struct inode *ip;
+
+  if(argstr(0, &old) < 0 || argstr(1, &new) < 0)
+    return -1;
+
+  begin_op();
+  if ((ip = create(new, T_SYMLINK, 0, 0)) == 0){
+      //iupdate(ip);
+    end_op();
+    return -1;
+  }
+  end_op();
+
+  ip->isSymbolicLink = 1;
+  
+  //create file for 'new'
+  struct file * f;
+  if((f = filealloc()) == 0){
+    if(f)
+      fileclose(f);
+    iunlockput(ip);
+    end_op();
+    return -1;
+  }
+
+  //change new link's inode:
+  safestrcpy((char *)ip->addrs,old,strlen(old)+1);
+  //iupdate(ip);
+  iunlock(ip);
+
+  f->type = FD_INODE;
+  f->ip = ip;
+  f->off = 0;
+  f->readable = 1;
+  f->writable = 0;
+
+  return 0;
+}
+
+int
+sys_readlink(void)
+{
+  char *pathname, *buf;
+  int temp;
+
+  if(argstr(0, &pathname) < 0 || argstr(1, &buf) < 0 || argint(2, &temp) < 0)
+    return -1;
+  
+  uint bufsize = temp;
+
+  struct inode *ip, *sym_ip;
+  begin_op();
+  //ToDo: maybe change namei
+  if((ip = namei(pathname)) == 0){
+    end_op();
+    return -1;
+  }
+  end_op();
+
+  ilock(ip);
+
+  if (!ip->isSymbolicLink){
+    goto cleanup;
+  }
+  
+  
+  //dReferencing 
+  for (int i = 0; i < MAX_DEREFERENCE; i++)
+  {
+    if((sym_ip = namei((char *)ip->addrs)) == 0){
+      goto cleanup;
+    }
+
+    if (sym_ip->isSymbolicLink){
+      iunlock(ip);
+      ip = sym_ip;
+      //re read inode from disk;
+      ilock(ip);      
+    }else{
+      break;
+    }  
+    
+  }
+
+  //copy buffer    //TODO: copy also indirect block and double indrict block
+  if(ip->isSymbolicLink){
+    safestrcpy(buf,(char *)ip->addrs,bufsize);
+    iunlock(ip);
+    return 0;
+  }
+
+cleanup:
+  iunlock(ip);
+  return -1;
+}
+

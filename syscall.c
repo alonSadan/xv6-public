@@ -82,6 +82,8 @@ argstr(int n, char **pp)
   return fetchstr(addr, pp);
 }
 
+extern int sys_symlink(void);
+extern int sys_readlink(void);
 extern int sys_chdir(void);
 extern int sys_close(void);
 extern int sys_dup(void);
@@ -105,6 +107,8 @@ extern int sys_write(void);
 extern int sys_uptime(void);
 
 static int (*syscalls[])(void) = {
+[SYS_readlink]		sys_readlink,
+[SYS_symlink]		sys_symlink,
 [SYS_fork]    sys_fork,
 [SYS_exit]    sys_exit,
 [SYS_wait]    sys_wait,

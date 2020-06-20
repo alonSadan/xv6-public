@@ -396,7 +396,7 @@ bmap(struct inode *ip, uint bn)
     return addr;
   }
 
-  cprintf("block number:%d\n",bn);
+  //cprintf("block number:%d\n",bn);
   bn -= NINDIRECT;
   //level 0
   if (bn < DOUBLE_INDIRECT){
@@ -404,26 +404,23 @@ bmap(struct inode *ip, uint bn)
     if((addr = ip->addrs[NDIRECT+1]) == 0)
       ip->addrs[NDIRECT+1] = addr = balloc(ip->dev);
 
-    
-
     //level 1
     bp = bread(ip->dev, addr);
     a = (uint*)bp->data;
 
-    if((addr = a[bn/128]) == 0){
-      a[bn/128] = addr = balloc(ip->dev);
+    if((addr = a[bn/NINDIRECT]) == 0){
+      a[bn/NINDIRECT] = addr = balloc(ip->dev);
       log_write(bp);
-      brelse(bp);
     }
+    brelse(bp);
 
     //level 2
     bp = bread(ip->dev, addr);
     a = (uint*)bp->data;
 
-    if((addr = a[bn%128]) == 0){
-      a[bn%128] = addr = balloc(ip->dev);
+    if((addr = a[bn%NINDIRECT]) == 0){
+      a[bn%NINDIRECT] = addr = balloc(ip->dev);
       log_write(bp);
-     // brelse(bp);
     }
 
     brelse(bp);

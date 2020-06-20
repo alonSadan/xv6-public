@@ -23,6 +23,7 @@ struct inode {
   short nlink;
   uint size;
   uint addrs[NDIRECT+2];
+  int isSymbolicLink;
 };
 
 // table mapping major device number to
@@ -35,3 +36,4 @@ struct devsw {
 extern struct devsw devsw[];
 
 #define CONSOLE 1
+#define MAX_DEREFERENCE 31

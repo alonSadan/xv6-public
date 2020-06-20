@@ -685,6 +685,32 @@ namex(char *path, int nameiparent, char *name)
     iput(ip);
     return 0;
   }
+
+  //d-Refernce
+  //dReferencing 
+  // ilock(ip);
+  // if (ip->isSymbolicLink){
+  //   struct inode *sym_ip;
+  //   for (int i = 0; i < MAX_DEREFERENCE; i++)
+  //   {
+  //     if((sym_ip = namei((char *)ip->addrs)) == 0){
+  //       iunlock(ip);
+  //       return 0;
+  //     }
+
+  //     if (sym_ip->isSymbolicLink){
+  //       iunlock(ip);
+  //       ip = sym_ip;
+  //       //re read inode from disk;
+  //       ilock(ip);      
+  //     }else{
+  //       break;
+  //     }  
+      
+  //   }
+  // }
+  // iunlock(ip);
+
   return ip;
 }
 

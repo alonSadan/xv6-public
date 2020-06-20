@@ -17,6 +17,9 @@
 #include "file.h"
 #include "fcntl.h"
 
+static int 
+readlink(char *pathname,char *buf,uint bufsize);
+
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
 static int
@@ -386,6 +389,7 @@ sys_chdir(void)
     end_op();
     return -1;
   }
+  
   ilock(ip);
   if(ip->type != T_DIR){
     iunlockput(ip);
@@ -422,6 +426,14 @@ sys_exec(void)
     if(fetchstr(uarg, &argv[i]) < 0)
       return -1;
   }
+  
+  //ToDo: check the limit for link length
+  char new_path[100];
+  //if symbolic link - exec with new_path
+  if (readlink(path,new_path,100) == 0){   
+      return exec(new_path, argv);
+  }
+
   return exec(path, argv);
 }
 
@@ -493,18 +505,10 @@ sys_symlink(void)
   return 0;
 }
 
-int
-sys_readlink(void)
-{
-  char *pathname, *buf;
-  int temp;
+static int 
+readlink(char *pathname,char *buf,uint bufsize){
 
-  if(argstr(0, &pathname) < 0 || argstr(1, &buf) < 0 || argint(2, &temp) < 0)
-    return -1;
-  
-  uint bufsize = temp;
-
-  struct inode *ip, *sym_ip;
+  struct inode *ip;
   begin_op();
   //ToDo: maybe change namei
   if((ip = namei(pathname)) == 0){
@@ -516,37 +520,30 @@ sys_readlink(void)
   ilock(ip);
 
   if (!ip->isSymbolicLink){
-    goto cleanup;
-  }
-  
-  
-  //dReferencing 
-  for (int i = 0; i < MAX_DEREFERENCE; i++)
-  {
-    if((sym_ip = namei((char *)ip->addrs)) == 0){
-      goto cleanup;
-    }
-
-    if (sym_ip->isSymbolicLink){
-      iunlock(ip);
-      ip = sym_ip;
-      //re read inode from disk;
-      ilock(ip);      
-    }else{
-      break;
-    }  
-    
-  }
-
-  //copy buffer    //TODO: copy also indirect block and double indrict block
-  if(ip->isSymbolicLink){
-    safestrcpy(buf,(char *)ip->addrs,bufsize);
     iunlock(ip);
-    return 0;
+    return -1;
   }
-
-cleanup:
+  
+  //copy buffer    //TODO: copy also indirect block and double indrict block
+  safestrcpy(buf,(char *)ip->addrs,bufsize);
   iunlock(ip);
-  return -1;
+  return 0;
+}
+
+
+
+int
+sys_readlink(void)
+{
+  char *pathname, *buf;
+  int temp;
+
+  if(argstr(0, &pathname) < 0 || argstr(1, &buf) < 0 || argint(2, &temp) < 0)
+    return -1;
+
+  uint bufsize = temp;
+
+  return readlink(pathname,buf,bufsize);
+ 
 }
 
